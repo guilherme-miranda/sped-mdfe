@@ -268,8 +268,10 @@ class Tools
             if (!array_key_exists($version, $this->availableVersions)) {
                 throw new \InvalidArgumentException('Essa versão de layout não está disponível');
             }
+            if (empty($this->config->schemes)) {
+                $this->config->schemes = $this->availableVersions[$version];
+            }
             $this->versao = $version;
-            $this->config->schemes = $this->availableVersions[$version];
             $this->pathschemes = realpath(
                 __DIR__ . '/../../schemes/' . $this->config->schemes
             ) . '/';
