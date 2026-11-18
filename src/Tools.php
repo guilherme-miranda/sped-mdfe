@@ -33,7 +33,8 @@ class Tools extends ToolsCommon
         $aXml,
         $idLote = '',
         $indSinc = 0
-    ) {
+    )
+    {
         if (!is_array($aXml)) {
             throw new \InvalidArgumentException('Os XML das MDFe devem ser passados em um array.');
         }
@@ -102,7 +103,7 @@ class Tools extends ToolsCommon
 
     /**
      * @author Cleiton Perin
-     * Consulta o status da MDFe pela chave de 44 digitos
+     * Consulta o status da MDFe pela chave de 44 caracteres
      *
      * @param string $chave
      * @param string $tpAmb
@@ -203,27 +204,34 @@ class Tools extends ToolsCommon
      * @param string $cUF
      * @param string $cMun
      * @param string $dtEnc
+     * @param string $indEncPorTerceiro
      * @return string
      */
     public function sefazEncerra(
-        $chave = '',
-        $nProt = '',
-        $cUF = '',
-        $cMun = '',
-        $dtEnc = ''
-    ) {
+        $chave,
+        $nProt,
+        $cUF,
+        $cMun,
+        $dtEnc = '',
+        $indEncPorTerceiro = ''
+    )
+    {
         $tpEvento = 110112;
         $nSeqEvento = 1;
         if ($dtEnc == '') {
-            $dtEnc = date('Y-m-d');
+            $dt = new \DateTime('now', new \DateTimeZone($this->timezone));
+            $dtEnc = $dt->format('Y-m-d');
         }
         $tagAdic = "<evEncMDFe>"
             . "<descEvento>Encerramento</descEvento>"
             . "<nProt>$nProt</nProt>"
             . "<dtEnc>$dtEnc</dtEnc>"
             . "<cUF>$cUF</cUF>"
-            . "<cMun>$cMun</cMun>"
-            . "</evEncMDFe>";
+            . "<cMun>$cMun</cMun>";
+        if (!empty($indEncPorTerceiro)) {
+            $tagAdic .= "<indEncPorTerceiro>$indEncPorTerceiro</indEncPorTerceiro>";
+        }
+        $tagAdic .= "</evEncMDFe>";
         return $this->sefazEvento(
             $this->config->siglaUF,
             $chave,
@@ -247,7 +255,8 @@ class Tools extends ToolsCommon
         $nSeqEvento = '1',
         $xNome = '',
         $cpf = ''
-    ) {
+    )
+    {
         $tpEvento = 110114;
         $tagAdic = "<evIncCondutorMDFe>"
             . "<descEvento>Inclusao Condutor</descEvento>"
@@ -273,9 +282,7 @@ class Tools extends ToolsCommon
      * @param string $nProt
      * @param string $cMunCarrega
      * @param string $xMunCarrega
-     * @param string $cMunDescarga
-     * @param string $xMunDescarga
-     * @param string $chNFe
+     * @param array $infDoc
      * @param int $nSeqEvento
      * @return string
      */
@@ -284,23 +291,24 @@ class Tools extends ToolsCommon
         $nProt = '',
         $cMunCarrega = '',
         $xMunCarrega = '',
-        $cMunDescarga = '',
-        $xMunDescarga = '',
-        $chNFe = '',
+        $infDoc = [],
         $nSeqEvento = '1'
-    ) {
+    )
+    {
         $tpEvento = 110115;
         $tagAdic = "<evIncDFeMDFe>"
             . "<descEvento>Inclusao DF-e</descEvento>"
             . "<nProt>$nProt</nProt>"
             . "<cMunCarrega>$cMunCarrega</cMunCarrega>"
-            . "<xMunCarrega>$xMunCarrega</xMunCarrega>"
-            . "<infDoc>"
-            . "<cMunDescarga>$cMunDescarga</cMunDescarga>"
-            . "<xMunDescarga>$xMunDescarga</xMunDescarga>"
-            . "<chNFe>$chNFe</chNFe>"
-            . "</infDoc>"
-            . "</evIncDFeMDFe>";
+            . "<xMunCarrega>$xMunCarrega</xMunCarrega>";
+        foreach ($infDoc as $infDocItem) {
+            $tagAdic = $tagAdic . "<infDoc>"
+                . "<cMunDescarga>{$infDocItem['cMunDescarga']}</cMunDescarga>"
+                . "<xMunDescarga>{$infDocItem['xMunDescarga']}</xMunDescarga>"
+                . "<chNFe>{$infDocItem['chNFe']}</chNFe>"
+                . "</infDoc>";
+        }
+        $tagAdic = $tagAdic . "</evIncDFeMDFe>";
 
         return $this->sefazEvento(
             $this->config->siglaUF,
@@ -326,12 +334,14 @@ class Tools extends ToolsCommon
             $this->tpAmb
         );
         $cnpj = $this->config->cnpj;
+        $sigla = (strlen($cnpj) == 11) ? 'CPF' : 'CNPJ';
         $request = "<consMDFeNaoEnc xmlns=\"$this->urlPortal\" versao=\"$this->urlVersion\">"
             . "<tpAmb>$this->tpAmb</tpAmb>"
             . "<xServ>CONSULTAR NÃO ENCERRADOS</xServ>"
-            . "<CNPJ>$cnpj</CNPJ>"
+            . "<{$sigla}>$cnpj</{$sigla}>"
             . "</consMDFeNaoEnc>";
         $this->lastRequest = $request;
+        $this->isValid($this->urlVersion, $request, 'consMDFeNaoEnc');
         $parameters = ['mdfeDadosMsg' => $request];
         $body = "<mdfeDadosMsg xmlns=\"$this->urlNamespace\">$request</mdfeDadosMsg>";
         $this->lastResponse = $this->sendRequest($body, $parameters);
@@ -349,13 +359,14 @@ class Tools extends ToolsCommon
      * @param string $tagAdic
      * @return   string
      */
-    protected function sefazEvento(
+    public function sefazEvento(
         $uf,
         $chave,
         $tpEvento,
         $nSeqEvento = 1,
         $tagAdic = ''
-    ) {
+    )
+    {
         //carrega serviço
         $servico = 'MDFeRecepcaoEvento';
         $this->servico(
@@ -364,8 +375,8 @@ class Tools extends ToolsCommon
             $this->tpAmb
         );
         $cnpj = $this->config->cnpj;
-        $sigla = strlen($cnpj) == 11 ? 'CPF' : 'CNPJ';
-        $dt = new \DateTime();
+        $sigla = (strlen($cnpj) == 11) ? 'CPF' : 'CNPJ';
+        $dt = new \DateTime('now', new \DateTimeZone($this->timezone));
         $dhEvento = $dt->format('Y-m-d\TH:i:sP');
         $sSeqEvento = str_pad($nSeqEvento, 2, "0", STR_PAD_LEFT);
         $eventId = "ID" . $tpEvento . $chave . $sSeqEvento;
@@ -374,7 +385,7 @@ class Tools extends ToolsCommon
             . "<infEvento Id=\"$eventId\">"
             . "<cOrgao>$cOrgao</cOrgao>"
             . "<tpAmb>$this->tpAmb</tpAmb>"
-            . "<$sigla>$cnpj</$sigla>"
+            . "<{$sigla}>$cnpj</{$sigla}>"
             . "<chMDFe>$chave</chMDFe>"
             . "<dhEvento>$dhEvento</dhEvento>"
             . "<tpEvento>$tpEvento</tpEvento>"
@@ -405,14 +416,15 @@ class Tools extends ToolsCommon
     /**
      * Service for the distribution of summary information and
      * electronic tax documents of interest to an actor.
-     * @param integer $ultNSU  last NSU number recived
-     * @param integer $numNSU  NSU number you wish to consult
+     * @param integer $ultNSU last NSU number recived
+     * @param integer $numNSU NSU number you wish to consult
      * @return string
      */
     public function sefazDistDFe(
         $ultNSU = 0,
         $numNSU = 0
-    ) {
+    )
+    {
         //carrega serviço
         $servico = 'MDFeDistribuicaoDFe';
         $this->servico(
@@ -428,12 +440,12 @@ class Tools extends ToolsCommon
         }
         //monta a consulta
         $request = "<distDFeInt xmlns=\"$this->urlPortal\" versao=\"$this->urlVersion\">"
-            . "<tpAmb>".$this->tpAmb."</tpAmb>"
-            . ((strlen($this->config->cnpj)==14) ?
-                "<CNPJ>".$this->config->cnpj."</CNPJ>" :
-                "<CPF>".$this->config->cnpj."</CPF>"
+            . "<tpAmb>" . $this->tpAmb . "</tpAmb>"
+            . ((strlen($this->config->cnpj) == 14) ?
+                "<CNPJ>" . $this->config->cnpj . "</CNPJ>" :
+                "<CPF>" . $this->config->cnpj . "</CPF>"
             )
-            . $tagNSU."</distDFeInt>";
+            . $tagNSU . "</distDFeInt>";
         //valida o xml da requisição
         $this->isValid($this->urlVersion, $request, 'distDFeInt');
         $this->lastRequest = $request;

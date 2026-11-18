@@ -154,6 +154,10 @@ class Tools
      * @var string
      */
     protected $typePerson = 'J';
+    /**
+     * @var string
+     */
+    protected $timezone;
 
     protected $soapnamespaces = [
         'xmlns:xsi' => "http://www.w3.org/2001/XMLSchema-instance",
@@ -197,7 +201,7 @@ class Tools
      */
     public function setEnvironmentTimeZone($acronym)
     {
-        date_default_timezone_set(TimeZoneByUF::get($acronym));
+        $this->timezone = TimeZoneByUF::get($acronym);
     }
 
     /**
@@ -268,8 +272,10 @@ class Tools
             if (!array_key_exists($version, $this->availableVersions)) {
                 throw new \InvalidArgumentException('Essa versão de layout não está disponível');
             }
+            if (empty($this->config->schemes)) {
+                $this->config->schemes = $this->availableVersions[$version];
+            }
             $this->versao = $version;
-            $this->config->schemes = $this->availableVersions[$version];
             $this->pathschemes = realpath(
                 __DIR__ . '/../../schemes/' . $this->config->schemes
             ) . '/';
@@ -320,7 +326,7 @@ class Tools
      * @return string singed MDFe xml
      * @throws RuntimeException
      */
-    public function signMDFe($xml)
+    public function signMDFe($xml, $validXSD = 1)
     {
         //remove all invalid strings
         $xml = Strings::clearXmlString($xml);
@@ -347,21 +353,23 @@ class Tools
 
         $modal = (int) $dom->getElementsByTagName('modal')->item(0)->nodeValue;
         //validate
-        $this->isValid($this->versao, $signed, $method);
-        //validate modal
-        switch ($modal) {
-            case 1:
-                $this->isValid($this->versao, $this->getModalXML($dom, 'rodo'), $method . 'ModalRodoviario');
-                break;
-            case 2:
-                $this->isValid($this->versao, $this->getModalXML($dom, 'aereo'), $method . 'ModalAereo');
-                break;
-            case 3:
-                $this->isValid($this->versao, $this->getModalXML($dom, 'aquav'), $method . 'ModalAquaviario');
-                break;
-            case 4:
-                $this->isValid($this->versao, $this->getModalXML($dom, 'ferrov'), $method . 'ModalFerroviario');
-                break;
+        if($validXSD == 1){
+            $this->isValid($this->versao, $signed, $method);
+            //validate modal
+            switch ($modal) {
+                case 1:
+                    $this->isValid($this->versao, $this->getModalXML($dom, 'rodo'), $method . 'ModalRodoviario');
+                    break;
+                case 2:
+                    $this->isValid($this->versao, $this->getModalXML($dom, 'aereo'), $method . 'ModalAereo');
+                    break;
+                case 3:
+                    $this->isValid($this->versao, $this->getModalXML($dom, 'aquav'), $method . 'ModalAquaviario');
+                    break;
+                case 4:
+                    $this->isValid($this->versao, $this->getModalXML($dom, 'ferrov'), $method . 'ModalFerroviario');
+                    break;
+            }
         }
         return $signed;
     }

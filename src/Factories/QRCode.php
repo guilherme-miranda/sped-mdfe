@@ -16,6 +16,7 @@ namespace NFePHP\MDFe\Factories;
  */
 
 use DOMDocument;
+use NFePHP\Common\Keys;
 use NFePHP\MDFe\Exception\DocumentsException;
 
 class QRCode
@@ -34,7 +35,7 @@ class QRCode
         $infMDFe = $dom->getElementsByTagName('infMDFe')->item(0);
         $ide = $dom->getElementsByTagName('ide')->item(0);
         $tpEmis = $ide->getElementsByTagName('tpEmis')->item(0)->nodeValue;
-        $chMDFe = preg_replace('/[^0-9]/', '', $infMDFe->getAttribute("Id"));
+        $chMDFe = Keys::extractAccessKey($infMDFe->getAttribute("Id"));
         $sign = '';
         if ($tpEmis == 2) {
             $sign = "&sign=" . base64_encode($certificate->sign($chMDFe));
